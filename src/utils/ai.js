@@ -1,17 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
 export async function generatePersonalizedReading(apiKey, question, hexagramData, language = 'en') {
-  if (!apiKey) {
-    throw new Error("API Key is required");
-  }
+  // If the user provided a key directly, use client-side SDK
+  if (apiKey) {
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+    
+    const langInstruction = language === 'zh' 
+      ? 'Please provide the response ENTIRELY in Simplified Chinese.' 
+      : 'Please provide the response in English.';
 
-  const ai = new GoogleGenAI({ apiKey: apiKey });
-  
-  const langInstruction = language === 'zh' 
-    ? 'Please provide the response ENTIRELY in Simplified Chinese.' 
-    : 'Please provide the response in English.';
-
-  const prompt = `
+    const prompt = `
 You are an expert in the I Ching (Book of Changes).
 The user has asked the following question: "${question}"
 
@@ -27,14 +25,38 @@ Limit the response to 2-3 concise paragraphs.
 ${langInstruction}
 `;
 
-  try {
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-    });
-    return response.text;
-  } catch (error) {
-    console.error("Error generating reading:", error);
-    throw error;
+    try {
+      const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+      });
+      return response.text;
+    } catch (error) {
+      console.error("Error generating reading client-side:", error);
+      throw error;
+    }
+  } 
+  
+  // If no API key is provided, proxy the request to our secure Vercel backend function
+  else {
+    try {
+      const res = await fetch('/api/generate-reading', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question, hexagramData, language }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Proxy error: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      return data.text;
+    } catch (error) {
+      console.error("Error generating reading via proxy:", error);
+      throw error;
+    }
   }
 }

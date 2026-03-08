@@ -94,7 +94,8 @@ function App() {
         const data = getHexagramData(newTosses);
         setResult(data);
 
-        // Try generating AI reading if API key is provided
+        // Try generating AI reading automatically ONLY if they provided their own API key.
+        // If they did not provide a key, they will click the manual button in the UI to use the proxy in order to control costs.
         if (apiKey && question) {
           setIsGenerating(true);
           try {
@@ -283,9 +284,46 @@ function App() {
                     {aiReading}
                   </div>
                 ) : (
-                  <p style={{color: 'var(--text-secondary)'}}>
-                    {language === 'en' ? 'Provide a Gemini API key on the starting screen to receive a personalized AI reading here.' : '在开始界面提供您的 Gemini API 密钥，即可以此问题获取个性化 AI 解卦。'}
-                  </p>
+                  <div>
+                    <p style={{color: 'var(--text-secondary)', marginBottom: '1rem'}}>
+                      {language === 'en' 
+                        ? 'Would you like a personalized AI interpretation of this hexagram for your question?' 
+                        : '您希望获得针对此问题的个性化 AI 卦象解读吗？'}
+                    </p>
+                    <button 
+                      className="btn-primary" 
+                      onClick={async () => {
+                        setIsGenerating(true);
+                        try {
+                           const topToBottom = [...result.presentBinary].reverse();
+                           const binaryString = topToBottom.join('');
+                           let match = null;
+                           for (const key in ichingData) {
+                             const dbBinary = String(ichingData[key].binary).padStart(6, '0');
+                             if (dbBinary === binaryString) {
+                               match = ichingData[key];
+                               break;
+                             }
+                           }
+                           if (match) {
+                             // Pass the existing apiKey (which is empty string) to trigger the proxy
+                             const reading = await generatePersonalizedReading(apiKey, question, match, language);
+                             setAiReading(reading);
+                           }
+                        } catch (err) {
+                           console.error(err);
+                           setAiReading(language === 'en' 
+                             ? "Failed to generate free reading. The server may be experiencing high load." 
+                             : "生成免费解卦失败。服务器可能负载过高。");
+                        } finally {
+                           setIsGenerating(false);
+                        }
+                      }}
+                      style={{ padding: '0.8rem 1.5rem', fontSize: '1rem' }}
+                    >
+                      {language === 'en' ? 'Get AI Reading' : '获取 AI 解卦'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
