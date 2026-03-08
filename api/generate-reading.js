@@ -1,15 +1,32 @@
-const { GoogleGenAI } = require('@google/genai');
+import { GoogleGenAI } from '@google/genai';
 
-module.exports = async function handler(req, res) {
+export const config = {
+  runtime: 'edge', // Use Edge runtime for better performance, fetch support, and ES module compatibility
+};
+
+export default async function handler(req) {
   // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405 });
   }
 
-  const { question, hexagramData, language } = req.body;
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body', details: err.message }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const { question, hexagramData, language } = body;
 
   if (!question || !hexagramData) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // Read the API Key securely from Vercel Environment Variables
@@ -17,7 +34,10 @@ module.exports = async function handler(req, res) {
 
   if (!apiKey) {
     console.error("Server is missing GEMINI_API_KEY");
-    return res.status(500).json({ error: 'Server configuration error' });
+    return new Response(JSON.stringify({ error: 'Server configuration error: Missing GEMINI_API_KEY' }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -47,9 +67,19 @@ ${langInstruction}
         model: 'gemini-2.5-flash',
         contents: prompt,
     });
-    return res.status(200).json({ text: response.text });
+    return new Response(JSON.stringify({ text: response.text }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error) {
     console.error("Error generating reading:", error);
-    return res.status(500).json({ error: 'Failed to generate reading' });
+    return new Response(JSON.stringify({ 
+      error: 'Failed to generate reading', 
+      details: error.message,
+      stack: error.stack
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
